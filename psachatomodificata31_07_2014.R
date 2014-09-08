@@ -221,21 +221,20 @@ mod2 <-gamm4(Estimate ~ s(productivity * susceptibility, k=4) , random=~ (1|zone
 mod3 <-gamm4(Estimate ~ s(productivity * susceptibility, k=4)+zone , random=~ (1|Stock), weights=bigone2$wts,data=bigone2, REML=FALSE)
 mod4 <-gamm4(Estimate ~ s(productivity * susceptibility, k=4)+zone, weights=bigone2$wts,data=bigone2, REML=FALSE)
 
-mod41<-gamm4(Estimate ~ s(productivity, k=4)+ s(susceptibility, k=4)+zone, weights=bigone2$wts,data=bigone2, REML=FALSE)
+mod41<-gamm4(Estimate ~ s(productivity, k=4)+ s(susceptibility, k=4), weights=bigone2$wts,data=bigone2, REML=FALSE)
 mod41a <-gamm4(Estimate ~ s(productivity, k=4)+ s(susceptibility, k=4) , random=~ (1|zone), weights=bigone2$wts,data=bigone2, REML=FALSE)
 
-mod42 <-gamm4(Estimate ~ productivity * susceptibility+zone , random=~ (1|zone), weights=bigone2$wts,data=bigone2, REML=FALSE)
-mod43 <-gamm4(Estimate ~ productivity + zone , random=~ (1|zone),   weights=bigone2$wts,data=bigone2, REML=FALSE)
-mod44 <-gamm4(Estimate ~ susceptibility + zone , random=~ (1|zone), weights=bigone2$wts,data=bigone2 , REML=FALSE)
+mod42 <-gamm4(Estimate ~ productivity * susceptibility , random=~ (1|zone), weights=bigone2$wts,data=bigone2, REML=FALSE)
+mod43 <-gamm4(Estimate ~ productivity  , random=~ (1|zone),   weights=bigone2$wts,data=bigone2, REML=FALSE)
+mod44 <-gamm4(Estimate ~ susceptibility , random=~ (1|zone), weights=bigone2$wts,data=bigone2 , REML=FALSE)
 #mod45 <-gamm4(Estimate ~ susceptibility+zone ,           weights=wts,data=bigone2)
 
-mod31 <-gamm4(Estimate ~ s(productivity,k=4)+ s(susceptibility, k=4)+zone ,           weights=bigone2$wts,data=bigone2, REML=FALSE)
+mod31 <-gamm4(Estimate ~ s(productivity,k=4)+ s(susceptibility, k=4) ,           weights=bigone2$wts,data=bigone2, REML=FALSE)
 
 AIC(mod1$mer,mod2$mer,mod3$mer, mod4$mer,mod31$mer, mod41$mer,mod41a$mer, mod42$mer, mod43$mer, mod44$mer)
 
-
 # refit best model with REML
-mod44REML <-gamm4(Estimate ~ susceptibility + zone , random=~ (1|zone), weights=bigone2$wts,data=bigone2, REML=TRUE)
+mod44REML <-gamm4(Estimate ~ susceptibility , random=~ (1|zone), weights=bigone2$wts,data=bigone2, REML=TRUE)
 #mod44REML <-gamm4(Estimate ~ susceptibility + zone , random=~ (1|zone), weights=bigone2$wts,data=bigone2, REML=TRUE)
 
 summary(mod44REML$mer)
