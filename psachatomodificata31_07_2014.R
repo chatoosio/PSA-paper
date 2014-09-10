@@ -500,7 +500,7 @@ table(aa1$family, aa1$GSA)
 write.csv(merge(datafinal, subset(psa, select=c("Stock", "family", "supfam"), by=all)), file="predictedExploitation.csv")
 
 # try to plot overall results by super family and area
-datafinal2 <-merge(datafinal, subset(psa, select=c("Stock", "family", "supfam"), by=all))
+datafinal2 <-merge(datafinal, subset(psa, select=c("Stock", "family", "supfam", "condro"), by=all))
 
 # Plot density by GSA
 ggplot(datafinal2, aes(x=fit))+geom_density(aes(fill=factor(supfam),alpha=0.5))+
@@ -512,3 +512,83 @@ ggplot(datafinal2, aes(x=fit))+geom_density(aes(fill=factor(supfam),alpha=0.5))+
 ggplot(datafinal2, aes(x=fit))+geom_density(aes(fill=(supfam)))+facet_grid(supfam~.)+ theme(strip.text.y = element_text(size = 8, angle = 0))
 
 ggsave(last_plot(), file=paste("plotPredictFFmsy_KernelDensity",Sys.Date(),".png"), width=9, height=8, dpi=300)
+
+
+
+# Add plots for prediction diagnostics
+ggplot(datafinal2, aes(productivity, fit, color=supfam, ymin=cil, ymax=ciu))+ 
+  #  scale_colour_gradient2(midpoint=3, low="Darkgreen", high="red", name="Exploitation")+ 
+  #scale_colour_gradientn(colours=c("green","white","khaki2","yellow" ,"yellow2","orange","orange2","red","red2"),limits=c(0, 10),breaks=0:10, name="F/Fmsy")+
+	ylab("Predicted(F/Fmsy)")+
+	geom_errorbar(position = "jitter", alpha = 1/5)+
+	# stat_smooth()+
+	geom_hline( yintercept=1,linetype=4 )+
+  #geom_text(data=NULL, mapping=aes(x=1, y=0, label="F/Fmsy=1"), size=4)+
+	geom_point(position = "jitter", size=2)+
+	facet_grid(.~GSA)+
+  scale_y_continuous(breaks=c(1,4,7,9))+
+  scale_x_continuous(breaks=c(1,2,3))
+
+ggplot(datafinal2, aes(productivity, fit, color=condro, ymin=cil, ymax=ciu))+ 
+  #  scale_colour_gradient2(midpoint=3, low="Darkgreen", high="red", name="Exploitation")+ 
+  #scale_colour_gradientn(colours=c("green","white","khaki2","yellow" ,"yellow2","orange","orange2","red","red2"),limits=c(0, 10),breaks=0:10, name="F/Fmsy")+
+	ylab("Predicted(F/Fmsy)")+
+	geom_errorbar(position = "jitter")+
+	# stat_smooth()+
+	geom_hline( yintercept=1,linetype=4 )+
+  #geom_text(data=NULL, mapping=aes(x=1, y=0, label="F/Fmsy=1"), size=4)+
+	geom_point(position = "jitter", size=2)+
+	facet_grid(.~GSA)+
+  scale_y_continuous(breaks=c(1,4,7,9))+
+  scale_x_continuous(breaks=c(1,2,3))
+
+########### 
+# Compare fitted predictions for Hake with current assessments
+
+hake<-stockl2[stockl2$Species=="Merluccius merluccius",]
+hake2<-ddply(hake, .(GSA), summarize, Fratio=mean(Fratio))
+hake3<-merge(datafinal2[datafinal2$Stock=="Merluccius merluccius",], hake2, by="GSA")
+hake4<-merge(datafinal2[datafinal2$Stock=="Merluccius merluccius",], hake, by="GSA", all.y=TRUE)
+
+mullus<-stockl2[stockl2$Species=="Mullus barbatus",]
+mullus2<-ddply(hake, .(GSA), summarize, Fratio=mean(Fratio))
+hake3<-merge(datafinal2[datafinal2$Stock=="Mullus barbatus",], hake2, by="GSA")
+mullus4<-merge(datafinal2[datafinal2$Stock=="Mullus barbatus",], mullus, by="GSA", all.y=TRUE)
+
+
+ggplot(mullus4, aes(productivity, fit, color="GSA", ymin=cil, ymax=ciu))+ 
+  ylab("Predicted(F/Fmsy)")+
+  geom_errorbar()+
+	geom_hline( yintercept=1,linetype=4 )+
+ 	geom_point( size=2)+
+  geom_point(aes( productivity, Fratio, color="blue"))+
+	facet_grid(.~GSA)
++
+  scale_y_continuous(breaks=c(1,4,7,9))+
+  scale_x_continuous(breaks=c(1,2,3))
+
+
+
+# plot only hake predictions
+ggplot(datafinal2[datafinal2$Stock=="Merluccius merluccius",], aes(productivity, fit, color=condro, ymin=cil, ymax=ciu))+ 
+  #  scale_colour_gradient2(midpoint=3, low="Darkgreen", high="red", name="Exploitation")+ 
+  #scale_colour_gradientn(colours=c("green","white","khaki2","yellow" ,"yellow2","orange","orange2","red","red2"),limits=c(0, 10),breaks=0:10, name="F/Fmsy")+
+  ylab("Predicted(F/Fmsy)")+
+	geom_errorbar()+
+	# stat_smooth()+
+	geom_hline( yintercept=1,linetype=4 )+
+  #geom_text(data=NULL, mapping=aes(x=1, y=0, label="F/Fmsy=1"), size=4)+
+	geom_point( size=2)+
+	facet_grid(.~GSA)+
+  scale_y_continuous(breaks=c(1,4,7,9))+
+  scale_x_continuous(breaks=c(1,2,3))
+
+prova<-merge(datafinal2, stockl2, by.x=c("Stock","GSA"), by.y=c("Species", "GSA"), all.y=TRUE)
+prova<-droplevels(prova)
+
+ggplot(prova, aes(productivity, fit, color=Stock, ymin=cil, ymax=ciu))+ 
+  geom_errorbar()+
+  geom_point( size=2)+
+  geom_point(aes(productivity, Fratio), shape=4)+
+	facet_grid(.~GSA, drop=TRUE)+
+  ylab("Predicted(F/Fmsy)")
