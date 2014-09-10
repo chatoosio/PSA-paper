@@ -475,8 +475,40 @@ ggplot(datafinal, aes(productivity, fit, color=fit, ymin=cil, ymax=ciu))+
 	geom_errorbar(position = "jitter", alpha = 1/5)+
 	# stat_smooth()+
 	geom_hline( yintercept=1,linetype=4 )+
+  #geom_text(data=NULL, mapping=aes(x=1, y=0, label="F/Fmsy=1"), size=4)+
 	geom_point(position = "jitter", size=2)+
-	facet_grid(.~GSA)
+	facet_grid(.~GSA)+
+  scale_y_continuous(breaks=c(1,4,7,9))+
+  scale_x_continuous(breaks=c(1,2,3))
 
 ggsave(last_plot(), file=paste("plotPredictFFmsy",Sys.Date(),".png"), width=14, height=8, dpi=300)
 
+head(datafinal)
+xtab(~GSA+fit, datafinal)
+a<-ddply(datafinal[datafinal$fit>1,], .(GSA), summarize,  n.stocks=length(unique(as.character(Stock))), .drop = TRUE)
+
+a<-datafinal[datafinal$fit<1,]
+a1<-merge(a, subset(psa, select=c("Stock", "family", "supfam"), by=all))
+table(a1$family, a1$GSA)
+table(a1$supfam[a1$GSA==20], a1$GSA[a1$GSA==20])
+
+# explore results
+aa<-datafinal[datafinal$cil<1,]
+aa1<-merge(aa, subset(psa, select=c("Stock", "family", "supfam"), by=all))
+table(aa1$family, aa1$GSA)
+
+write.csv(merge(datafinal, subset(psa, select=c("Stock", "family", "supfam"), by=all)), file="predictedExploitation.csv")
+
+# try to plot overall results by super family and area
+datafinal2 <-merge(datafinal, subset(psa, select=c("Stock", "family", "supfam"), by=all))
+
+# Plot density by GSA
+ggplot(datafinal2, aes(x=fit))+geom_density(aes(fill=factor(supfam),alpha=0.5))+
+  facet_grid(GSA~supfam)+ geom_vline( xintercept=1,linetype=4 ) +
+  #geom_text(data=NULL, mapping=aes(x=1, y=0, label="F/Fmsy=1"), size=4, angle=90, vjust=-0.4, hjust=0)+
+  xlab("Predicted F/Fmsy")+scale_x_continuous(breaks=c(1,3,5,7))+scale_y_continuous(breaks=c(0,1,2))+scale_fill_discrete(name="Superfamily")
+
+# Plot density for all areas combined, allows visualization of all superfamilies
+ggplot(datafinal2, aes(x=fit))+geom_density(aes(fill=(supfam)))+facet_grid(supfam~.)+ theme(strip.text.y = element_text(size = 8, angle = 0))
+
+ggsave(last_plot(), file=paste("plotPredictFFmsy_KernelDensity",Sys.Date(),".png"), width=9, height=8, dpi=300)
