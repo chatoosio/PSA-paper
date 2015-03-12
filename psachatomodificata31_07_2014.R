@@ -1,3 +1,8 @@
+# Copyright 2015 Giacomo Chato Osio, Alessandro Orio and Colin Millar. 
+# Distributed under the GPL 2 or later
+# Maintainer: Giacomo Chato Osio
+
+
 ################################################################################### 
 # R code to produce the analysis and plots of the PSA analysis of Demersal Mediterranean Stocks. Almost final version September 2014 , Author Chato Osio
 #
