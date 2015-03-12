@@ -3,11 +3,11 @@
 #
 #####################################################################################
 
-library(stringr); library(ggplot2); library(doBy); library(gamm4);library(lme4)
+library(stringr); library(ggplot2); library(doBy); library(gamm4);library(lme4); library(plyr); library(dplyr)
 
 #tab<-read.csv("S:/a4a/a4a 1stmtg/gfcm_datappormethods.csv", sep=";")
 
- setwd("S:/PSA/PSA_V3")
+setwd("S:/PSA/PSA_Final Sept 2014")
 
 # Load PSA scores
 
@@ -75,7 +75,9 @@ table(psa$Stock, psa$vulnerability)
 ######################################################################################################
 # MODEL FITTING
 ######################################################################################################
-# Part 1
+
+# Part 1 RATE OF CHANGE ~ PSA SCORES
+
 #instMedits.csv contiene le instantaneus rates of change per Medits 1994-2005. In pratica sono i valori che corrispondono alla zona piu' ispessita delle raindrops riportati nella figura del profile likelihood (i.e i maximum likelihood estimates)
 
 medinst<-read.csv("~/PSA/instMedits.csv")
@@ -140,6 +142,7 @@ ggplot(temp[temp$ratechange<10,], aes(ratechange,productivity))+geom_point(alpha
 
 
 ############################################################################
+
 # Part 2 Testing PSA scores ~ Rate of Decline in Thyrreninan Sea
 
 #coastal waters.csv 
@@ -216,50 +219,84 @@ bigone2<-bigone2[-11,]
 bigone2<-bigone2[-14,]
 
 # fit a first round of gamm's with smoother of interaction productivity and susceptibility
-mod1 <-gamm4(Estimate ~ s(productivity * susceptibility, k=4)+Stock , random=~ (1|zone), weights = bigone2$wts, data=bigone2, REML=FALSE)
-mod2 <-gamm4(Estimate ~ s(productivity * susceptibility, k=4) , random=~ (1|zone)+ (1|Stock), weights=bigone2wts,data=bigone2, REML=FALSE)
-mod3 <-gamm4(Estimate ~ s(productivity * susceptibility, k=4)+zone , random=~ (1|Stock), weights=bigone2$wts,data=bigone2, REML=FALSE)
-mod4 <-gamm4(Estimate ~ s(productivity * susceptibility, k=4)+zone, weights=bigone2$wts,data=bigone2, REML=FALSE)
+mod1 <-gamm4(Estimate ~ t2(productivity, susceptibility, k=4)+Stock,
+             random=~ (1|zone), weights = bigone2$wts, data=bigone2, REML=FALSE)
+mod2 <-gamm4(Estimate ~ t2(productivity, susceptibility, k=4),
+             random=~ (1|zone)+ (1|Stock), weights= bigone2$wts, data=bigone2, REML=FALSE)
+mod3 <-gamm4(Estimate ~ t2(productivity , susceptibility, k=4)+zone,
+             random=~ (1|Stock), weights=bigone2$wts,data=bigone2, REML=FALSE)
+mod4 <-gamm4(Estimate ~ t2(productivity , susceptibility, k=4)+zone,
+             weights=bigone2$wts,data=bigone2, REML=FALSE)
 
-mod41<-gamm4(Estimate ~ s(productivity, k=4)+ s(susceptibility, k=4), weights=bigone2$wts,data=bigone2, REML=FALSE)
-mod41a <-gamm4(Estimate ~ s(productivity, k=4)+ s(susceptibility, k=4) , random=~ (1|zone), weights=bigone2$wts,data=bigone2, REML=FALSE)
+mod41 <-gamm4(Estimate ~ s(productivity, k=4)+ s(susceptibility, k=4),
+              weights=bigone2$wts,data=bigone2, REML=FALSE)
+mod41a <-gamm4(Estimate ~ s(productivity, k=4)+ s(susceptibility, k=4),
+               random=~ (1|zone), weights=bigone2$wts,data=bigone2, REML=FALSE)
 
-mod42 <-gamm4(Estimate ~ productivity * susceptibility , random=~ (1|zone), weights=bigone2$wts,data=bigone2, REML=FALSE)
-mod43 <-gamm4(Estimate ~ productivity  , random=~ (1|zone),   weights=bigone2$wts,data=bigone2, REML=FALSE)
-mod44 <-gamm4(Estimate ~ susceptibility , random=~ (1|zone), weights=bigone2$wts,data=bigone2 , REML=FALSE)
+mod42 <-gamm4(Estimate ~ productivity * susceptibility,
+              random=~ (1|zone), weights=bigone2$wts,data=bigone2, REML=FALSE)
+mod43 <-gamm4(Estimate ~ productivity,
+              random=~ (1|zone),   weights=bigone2$wts,data=bigone2, REML=FALSE)
+mod44 <-gamm4(Estimate ~ susceptibility,
+              random=~ (1|zone), weights=bigone2$wts,data=bigone2 , REML=FALSE)
 #mod45 <-gamm4(Estimate ~ susceptibility+zone ,           weights=wts,data=bigone2)
 
-mod31 <-gamm4(Estimate ~ s(productivity,k=4)+ s(susceptibility, k=4) ,           weights=bigone2$wts,data=bigone2, REML=FALSE)
+mod31 <-gamm4(Estimate ~ s(productivity,k=4)+ s(susceptibility, k=4),
+              weights=bigone2$wts,data=bigone2, REML=FALSE)
 
-AIC(mod1$mer,mod2$mer,mod3$mer, mod4$mer,mod31$mer, mod41$mer,mod41a$mer, mod42$mer, mod43$mer, mod44$mer)
+mod5 <-gam(Estimate ~ susceptibility+zone,
+           weights=bigone2$wts, data=bigone2, REML=FALSE)
 
-# refit best model with REML
-mod44REML <-gamm4(Estimate ~ susceptibility , random=~ (1|zone), weights=bigone2$wts,data=bigone2, REML=TRUE)
-#mod44REML <-gamm4(Estimate ~ susceptibility + zone , random=~ (1|zone), weights=bigone2$wts,data=bigone2, REML=TRUE)
+mod6 <-gamm4(Estimate ~ t2(productivity, susceptibility, k=4)+zone, 
+             random=~ (1|Stock), weights = bigone2$wts, data=bigone2, REML=FALSE)
 
-summary(mod44REML$mer)
-summary(mod44REML$gam)
+# Get AIC
+AIC(mod1$mer,mod2$mer,mod3$mer, mod4$mer,mod31$mer, mod41$mer,mod41a$mer, mod42$mer, 
+    mod43$mer, mod44$mer, mod5, mod6$mer)
 
-# Generate a new data frame for prediction
-newdata<-data.frame(susceptibility=c(1.5, 2 , 2.5 , 3), zone=factor(c("adriatic", "tyrrhenian")))
+# calculate Delta AIC
+(AIC(mod1$mer,mod2$mer,mod3$mer, mod4$mer,mod31$mer, mod41$mer,mod41a$mer, mod42$mer, 
+     mod43$mer, mod44$mer, mod5)$AIC)-   
+  min(AIC(mod1$mer,mod2$mer,mod3$mer, mod4$mer,mod31$mer, mod41$mer,mod41a$mer, 
+          mod42$mer, mod43$mer, mod44$mer, mod5)$AIC)
+#####################################
+# Alternative from Colin
+models1 <- list(mod1,mod2,mod3, mod4,mod31, mod41,mod41a, mod42, 
+    mod43, mod44,  mod6)
+modnames1 <- c("mod1","mod2","mod3", "mod4","mod31", "mod41","mod41a", "mod42", 
+    "mod43", "mod44", "mod6")
 
-pred <- predict(mod44REML$gam, newdata, se.fit = TRUE)
+# get AIC, df, edf, and deltaAIC
+tab1 <- data.frame(
+  model = modnames1,
+  df = sapply(models1, function(x) attr(logLik(x $ mer), "df")),
+  AIC = sapply(models1, function(x) AIC(x $ mer)),
+  dAIC = NA,
+  edf = sapply(models, function(x) sum(x $ gam $ edf))
+)
+tab1 $ dAIC <- tab1 $ AIC - min(tab1 $ AIC)
+tab1
 
-# add predictions with approximate 95% confidence interval to prediction data.frame
-newdata$fit <- pred $ fit
-newdata$ciu <- pred $ fit + 2*pred $ se
-newdata$cil <- pred $ fit - 2*pred $ se
 
-# we plot the data, the fit and the upper and lower confidence intervals
-#plot(newdata$)
-plot(bigone2$susceptibility[bigone2$zone=="adriatic"], bigone2$Estimate[bigone2$zone=="adriatic"])
-lines(newdata$susceptibility, newdata$fit, col = "blue", lwd = 2)
-lines(newdata$susceptibility, newdata$ciu, col = "blue", lwd = 2, lty = 2)
-lines(newdata$susceptibility, newdata$cil, col = "blue", lwd = 2, lty = 2)
 
-ggplot(newdata, aes(susceptibility, fit))+
-	geom_line(aes(susceptibility, fit, fill=zone))+
-	geom_ribbon(data=newdata,aes(ymin=cil,ymax=ciu, fill=zone),alpha=0.2)
+#####################################
+gam.check(mod5)
+
+summary(mod5)
+
+# Get some diagnostics
+png(file="mod5_Diagnostics2.png",  width = 780, height = 780,  antialias = "cleartype")
+
+gam.check(mod5)
+
+dev.off()
+
+# Extract vector of Effective Degrees of Freedom from model fits
+c(summary(mod1$gam)$edf[1],
+  c(summary(mod2$gam)$edf[1],summary(mod3$gam)$edf[1],summary(mod4$gam)$edf[1],
+    summary(mod31$gam)$edf[1],summary(mod41$gam)$edf[1],summary(mod41a$gam)$edf[1],
+    summary(mod42$gam)$edf[1],summary(mod43$gam)$edf[1],summary(mod44$gam)$edf[1])) 
+
 
 
 ##########################################################################################
@@ -328,165 +365,186 @@ temp3<-temp2
 #temp3$GSA<-as.factor(temp3$GSA)
 summary(temp3)
 
+
+
+
+
+## NOTE only data where there is a non-NA GSA is used
+temp3 <- subset(temp3, !is.na(GSA))
+temp3 $ GSA <- temp3 $ GSA[drop = TRUE]
+temp3 <- temp3[temp3$GSA!="12-16",]
+temp3$GSA<- factor (temp3$GSA)
+
+
 # start selecting the random part
 
-Fmod1g <-gamm4(Fratio ~ s(productivity, by=susceptibility, k=4)+GSA , random=~(1| YS) + (1|Stock),    data=temp3, REML=FALSE)
+Fmod1g <-gamm4(log(Fratio) ~ t2(productivity, susceptibility, k=4)+GSA,
+               random=~(1| YS) + (1|Stock),    data=temp3, REML=FALSE)
 
-Fmod2g <-gamm4(Fratio ~  s(productivity, by=susceptibility, k=4)+GSA , random=~(1|Stock),    data=temp3, REML=FALSE)
+Fmod2g <-gamm4(log(Fratio) ~  t2(productivity, susceptibility, k=4)+GSA,
+               random=~(1|Stock),    data=temp3, REML=FALSE)
 
-#Fmod2g <-gamm4(Fratio ~ s(productivity,susceptibility, k=4)+GSA  , random=~(1| YS) + (1|GSA),    data=temp3, REML=FALSE)
-# Error in checkNlevels(reTrms$flist, n = n, control) : 
-#  grouping factors must have > 1 sampled level
-Fmod3g <-gamm4(Fratio ~ s(productivity, by = susceptibility, k=4)+GSA  , random=~  (1|YS),    data=temp3, REML=FALSE)
+Fmod2ag <-gamm4(log(Fratio) ~ t2(productivity, susceptibility, k=4)+GSA,
+                random=~(1| YS) + (1|GSA),    data=temp3, REML=FALSE)
 
-anova(Fmod1g$gam, Fmod2g$gam)
-anova(Fmod2g$gam, Fmod3g$gam)
+Fmod3g <-gamm4(log(Fratio) ~ t2(productivity,  susceptibility, k=4)+GSA,
+               random=~  (1|YS),    data=temp3, REML=FALSE)
 
 # try to drop interaction
-Fmod4g <-gamm4(Fratio ~ s(productivity, k=4)+ s(susceptibility,k=4)+GSA  , random=~ (1| YS)+(1|Stock),    data=temp3, REML=FALSE, na.action=na.omit)
+Fmod4g <-gamm4(log(Fratio) ~ s(productivity, k=4)+ s(susceptibility,k=4)+GSA,
+               random=~ (1| YS)+(1|Stock),    data=temp3, REML=FALSE, na.action=na.omit)
 # drop individual terms
-Fmod5g <-gamm4(Fratio ~ s(susceptibility,k=4)+GSA  , random=~ (1| YS)+(1|Stock),    data=temp3, REML=FALSE)
-Fmod6g <-gamm4(Fratio ~ s(productivity, k=4) +GSA  , random=~ (1| YS)+(1|Stock),    data=temp3, REML=FALSE)
-Fmod7g <-gamm4(Fratio ~ s(productivity, k=4) +GSA  , random=~ (1|Stock),            data=temp3, REML=FALSE)
-Fmod8g <-gamm4(Fratio ~ s(susceptibility, k=4) +GSA  , random=~ (1| Stock),              data=temp3, REML=FALSE)
-Fmod9g <-gamm4(Fratio ~ s(productivity, k=4)  ,      random=~ (1| YS),              data=temp3, REML=FALSE)
+Fmod5g <-gamm4(log(Fratio) ~ s(susceptibility,k=4)+GSA,
+               random=~ (1| YS)+(1|Stock),    data=temp3, REML=FALSE)
+Fmod6g <-gamm4(log(Fratio) ~ s(productivity, k=4)+GSA, 
+               random=~ (1| YS)+(1|Stock), data=temp3, REML=FALSE)
+Fmod7g <-gamm4(log(Fratio) ~ s(productivity, k=4) +GSA, 
+               random=~ (1|Stock), data=temp3, REML=FALSE)
+Fmod8g <-gamm4(log(Fratio) ~ s(susceptibility, k=4)+GSA, 
+               random=~ (1| Stock), data=temp3, REML=FALSE)
+Fmod9g <-gamm4(log(Fratio) ~ s(productivity, k=4),     
+               random=~ (1| YS), data=temp3, REML=FALSE)
+Fmod7sg <-gamm4(log(Fratio) ~ productivity + GSA  ,
+                random=~ (1|Stock), data=temp3, REML=FALSE)
 
-summary(Fmod7g$gam)
-AIC(Fmod1g$mer,Fmod3g$mer, Fmod4g$mer,Fmod5g$mer,Fmod6g$mer, Fmod7g$mer, Fmod8g$mer, Fmod9g$mer)
-#aa <- as.list(formula( Fmod4g$gam), formula( Fmod5g$gam),formula( Fmod6g$gam), formula( Fmod7g$gam), formula( Fmod8g$gam), formula( Fmod9g$gam))
-#do.call(formula, Fmod9g$gam)
+
+models <- list(Fmod1g, Fmod2g, Fmod2ag, Fmod3g, Fmod4g,Fmod5g,Fmod6g, Fmod7g, 
+               Fmod8g, Fmod9g, Fmod7sg)
+modnames <- c("Fmod1g", "Fmod2g", "Fmod2ag", "Fmod3g", "Fmod4g", "Fmod5g", "Fmod6g", "Fmod7g", 
+              "Fmod8g", "Fmod9g", "Fmod7sg")
+
+# get AIC, df, edf, and deltaAIC
+tab <- data.frame(
+  model = modnames,
+  df = sapply(models, function(x) attr(logLik(x $ mer), "df")),
+  AIC = sapply(models, function(x) AIC(x $ mer)),
+  dAIC = NA,
+  edf = sapply(models, function(x) sum(x $ gam $ edf))
+)
+tab $ dAIC <- tab $ AIC - min(tab $ AIC)
+tab
+
 
 # refit best model with REML
-Fmod7gREML <-gamm4(Fratio ~ s(productivity, k=4) +GSA  , random=~ (1|Stock), data=temp3, REML=TRUE)
+Fmod7sgREML <-gamm4(log(Fratio) ~ productivity +GSA  , random=~ (1|Stock), data=temp3, REML=TRUE)
 
-summary(Fmod7gREML$mer)
-summary(Fmod7gREML$gam)
+summary(Fmod7sgREML$mer)
+summary(Fmod7sgREML$gam)
+
+# Get some diagnostics
+png(file="Fmod7gREML_Diagnostics.png",  width = 480, height = 480)
+gam.check((Fmod7sgREML$gam))
+dev.off()
+
 
 
 # PREDICTION FUNCTION looping over GSAs to get a full dataset
 
-predStatus<-function(x, y, z){
-     pred <- predict(y, x, se.fit = TRUE)
-     x<-data.frame( Stock=(psa$Stock), productivity=psa$productivity, susceptibility=psa$susceptibility, GSA=factor(z)) 
+predStatus <- function(newdata, model = Fmod7sgREML $ gam) {
+  pred <- predict(model, newdata, se.fit = TRUE)
      
 # add predictions with approximate 95% confidence interval to prediction data.frame
-    x$fit <- pred $ fit
-    x$ciu <- pred $ fit + 2*pred $ se
-    x$cil <- pred $ fit - 2*pred $ se
+  newdata $ fit <- exp(pred $ fit)
+  newdata $ ciu <- exp(pred $ fit + 2*pred $ se)
+  newdata $ cil <- exp(pred $ fit - 2*pred $ se)
 
-    assign(paste("area", z, sep=""), x)
-
-
-      a<-ggplot(x, aes(productivity, fit, color=fit,shape=GSA, ymin=cil, ymax=ciu))+ geom_point(position = "jitter")+scale_colour_gradient2(midpoint=1, low="Darkgreen", high="red", name="Exploitation")+ ylab("Predicted(F/Fmsy)")+geom_errorbar(position = "jitter")+stat_smooth()+facet_grid(.~GSA)
-
-  print(a)
- #   return(x)
+#  a <- ggplot(x, aes(productivity, fit, color=fit,shape=GSA, ymin=cil, ymax=ciu))+ geom_point(position = "jitter")+scale_colour_gradient2(midpoint=1, low="Darkgreen", high="red", name="Exploitation")+ ylab("Predicted(F/Fmsy)")+geom_errorbar(position = "jitter")+stat_smooth()+facet_grid(.~GSA)
+#print(a)
+  newdata
 }
 
-predStatus(x = temp3, y = Fmod9gREML$gam, z = 9 )
 
-# Loop over all GSA
- for ( i in stockl$GSA){
-   a<-predStatus(newdata2, Fmod9gREML$gam, z= i)
-   assign(paste("area", i, sep=""), a)
-   return(a)
- }
-datafinal<-rbind(area1, area5,area6 ,area7 ,area9 ,area10 ,area11   ,area17 ,area18 ,area19, area20, area25 )
+newdata <- psa[c("Stock", "productivity", "susceptibility")]
 
-# Combine the datasets
-datafinal<-rbind(area1, area5,area6 ,area7 ,area9 ,area10 ,area11   ,area17 ,area18 ,area19, area20, area25 )
+datafinal <- do.call(rbind, lapply(levels(temp3 $ GSA), function(gsa) cbind(newdata, GSA = gsa)))
+datafinal <- datafinal[datafinal$GSA!="12-16",]# this gsa was giving problems with dimensions
+datafinal$GSA<- factor (datafinal$GSA)
+datafinal <- predStatus(datafinal, model = Fmod7sgREML $ gam)
 
-
-
-ggplot(datafinal, aes(productivity, fit, color=fit,shape=GSA, ymin=cil, ymax=ciu))+ 
-    geom_point(position = "jitter")+
-  scale_colour_gradient2(midpoint=3, low="Darkgreen", high="red", name="Exploitation")+ 
-  ylab("Predicted(F/Fmsy)")+
-  geom_errorbar(position = "jitter")+
-  stat_smooth()+
-  facet_grid(.~GSA)
-
-
-# Plot the predicted exploitation rates by area and stock with stock names
-ggplot(datafinal, aes(productivity, fit, color=fit, label=Stock))+ 
-  #  geom_point(position = "jitter")+ 
-  geom_text(position=position_jitter(h=1,w=1))+
-  scale_colour_gradient2(midpoint=3, low="Darkgreen", high="red", name="Exploitation")+ 
-  ylab("Predicted(F/Fmsy)")+
-  facet_grid(.~GSA)
-
-
-
-
-
-
-
-
-
-# Attempt prdicition
-newdata2<-data.frame( Stock=(psa$Stock), productivity=psa$productivity, susceptibility=psa$susceptibility, GSA=factor(17))  
-
-predStatus<-function(x, y){
-  pred <- predict(y, x, se.fit = TRUE)
-
-# add predictions with approximate 95% confidence interval to prediction data.frame
-x$fit <- pred $ fit
-x$ciu <- pred $ fit + 2*pred $ se
-x$cil <- pred $ fit - 2*pred $ se
-
-assign(paste("area", i, sep=""), x)
-
-
-a<-ggplot(x, aes(productivity, fit, color=fit,shape=GSA, ymin=cil, ymax=ciu))+ geom_point(position = "jitter")+scale_colour_gradient2(midpoint=1, low="Darkgreen", high="red", name="Exploitation")+ ylab("Predicted(F/Fmsy)")+geom_errorbar(position = "jitter")+stat_smooth()+facet_grid(.~GSA)
-print(a)
-return(x)
-}
-
-#newdata<-rbind(newdata, newdata2)
-
-predStatus(newdata2, Fmod8gREML$gam)
-
-
-
-ggplot(x, aes(productivity, fit, color=fit,shape=GSA, ymin=cil, ymax=ciu))+ geom_point(position = "jitter")+scale_colour_gradient2(midpoint=3, low="Darkgreen", high="red", name="Exploitation")+ ylab("Predicted(F/Fmsy)")+
-geom_errorbar(position = "jitter")+stat_smooth()+facet_grid(.~GSA)
-}
-#and
-vis.gam(Fmod8gREML$gam, view=c("susceptibility", "productivity"), theta=35)
-
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	# Only working prediciton.....
-	newdata2<-data.frame( Stock=(psa$Stock), productivity=psa$productivity, susceptibility=psa$susceptibility, GSA= factor(1))  
-
-#predStatus(x = newdata2, y = Fmod9gREML$gam, z = newdata2$GSA )
-
-for ( i in (newdata2$GSA)){
-	a<-predStatus(newdata2, Fmod7gREML$gam, z = i)
-	assign(paste("areaN", i, sep=""), a)
-	
-}
-
-datafinal<-rbind(areaN1, areaN5,areaN6 ,areaN7 ,areaN9 ,areaN10 ,areaN11   ,areaN17 ,areaN18 ,areaN19, areaN20, areaN25)
-
+# Plot predicted F/Fmsy for the unassessed stocks
 ggplot(datafinal, aes(productivity, fit, color=fit, ymin=cil, ymax=ciu))+ 
-	#  scale_colour_gradient2(midpoint=3, low="Darkgreen", high="red", name="Exploitation")+ 
-	scale_colour_gradientn(colours=c("green","white","khaki2","yellow" ,"yellow2","orange","orange2","red","red2"),limits=c(0, 10),breaks=0:10, name="F/Fmsy")+
-	ylab("Predicted(F/Fmsy)")+
-	geom_errorbar(position = "jitter", alpha = 1/5)+
-	# stat_smooth()+
-	geom_hline( yintercept=1,linetype=4 )+
-  #geom_text(data=NULL, mapping=aes(x=1, y=0, label="F/Fmsy=1"), size=4)+
-	geom_point(position = "jitter", size=2)+
-	facet_grid(.~GSA)+
-  scale_y_continuous(breaks=c(1,4,7,9))+
-  scale_x_continuous(breaks=c(1,2,3))
-
+    geom_point()+
+    scale_colour_gradient(low="Darkgreen", high="red", name="Exploitation")+ 
+    ylab("Predicted(F/Fmsy)")+xlab("Productivity")+
+    geom_errorbar()+
+    #stat_smooth(method = "loess")+
+    facet_grid(.~GSA) +
+    theme(legend.position = "bottom")+
+   #scale_y_continuous(breaks=c(1,4,7,9))+
+  scale_x_continuous(breaks=c(1,2,3))+
+  geom_hline( yintercept=1,linetype=4 )
 ggsave(last_plot(), file=paste("plotPredictFFmsy",Sys.Date(),".png"), width=14, height=8, dpi=300)
+
+# PLot fitted against predicted for assessed stocks
+
+datafinal2 <- predStatus(temp3, model = Fmod7sgREML $ gam)
+
+ggplot(datafinal2, aes(productivity, fit, color = Stock, ymin = cil, ymax = ciu)) +
+    ylab("Predicted(F/Fmsy)") +xlab("Productivity")+
+    geom_pointrange(position = position_dodge(width = 0.9))+
+    geom_point(aes(x = productivity, y = Fratio, color = Stock), shape = 4, 
+               position = position_dodge(width = 0.9)) +
+    facet_grid(.~GSA)+
+    guides(col = guide_legend(nrow = 2)) +
+    theme(legend.position = "bottom")+
+  scale_x_continuous(breaks=c(1,2,3))+
+  geom_hline( yintercept=1,linetype=4 )
+ggsave(last_plot(), file=paste("plotPredict_vs_Observed_FFmsy",Sys.Date(),".png"), width=11, height=8, dpi=300)
+
+# try to plot overall results by super family and area
+
+datafinal2 <-merge(datafinal, subset(psa, select=c("Stock", "family", "supfam", "condro"), by=all))
+
+# Plot density by GSA
+ggplot(datafinal2, aes(x=fit))+geom_density(aes(fill=factor(supfam),alpha=0.5))+
+  facet_grid(GSA~supfam)+ geom_vline( xintercept=1,linetype=4 ) +
+  #geom_text(data=NULL, mapping=aes(x=1, y=0, label="F/Fmsy=1"), size=4, angle=90, vjust=-0.4, hjust=0)+
+  xlab("Predicted F/Fmsy")+scale_x_continuous(breaks=c(1,3,5,7))+
+  scale_y_continuous(breaks=c(0,1,2))+scale_fill_discrete(name="Superfamily")
+
+# Plot density for all areas combined, allows visualization of all superfamilies
+ggplot(datafinal3, aes(x=fit))+geom_density(aes(fill=(supfam),alpha=0.5))+facet_grid(GSA~., scales= "free_y")+ 
+  theme(strip.text.y = element_text(size = 8, angle = 0))+
+  geom_vline( xintercept=1,linetype=4 ) +
+  scale_fill_discrete(name="Superfamily")+
+   xlab("Predicted F/Fmsy")
+
+ggsave(last_plot(), file=paste("plotPredictFFmsy_KernelDensity",Sys.Date(),".png"), width=9, height=8, dpi=300)
+
+
+
+
+########### 
+
+# Plot the ranking of Price*Landings+Vuln
+ranking <- read.csv("S:/PSA/PSA_Final Sept 2014/ranking_land_val_vuln.csv")
+names(ranking)<-c("landings", "price", "vuln", "Scientific_name", "rank")
+spe <- reorder(ranking$Scientific_name,ranking$rank)
+ranking <- ranking[order(ranking$rank, decreasing = TRUE),] 
+
+# define the stocks that are assessed
+temp4<-unique(subset(temp2, select= c("Stock", "assess")))
+ranking2<-merge(ranking, temp4, by.x="Scientific_name", by.y="Stock")
+
+# reorder the species based on rank
+ranking2$Scientific_name <- factor(ranking2$Scientific_name, levels = ranking2$Scientific_name[order(ranking2$rank)])
+
+ggplot(ranking2, aes(Scientific_name,rank, stat="bin"))+
+  geom_bar(aes(color=assess))+coord_flip()+
+scale_colour_discrete(name  = "Assessed Stock")+
+  xlab("")+ylab("Rank")+
+  opts(axis.text.y = theme_text(face = 'italic'))
+
+ggsave(last_plot(), file=paste("StockRankings",Sys.Date(),".png"), width=9, height=8, dpi=300)
+
+
+# Summarize results for results and discussion
 
 head(datafinal)
 xtab(~GSA+fit, datafinal)
 a<-ddply(datafinal[datafinal$fit>1,], .(GSA), summarize,  n.stocks=length(unique(as.character(Stock))), .drop = TRUE)
 
+# select stocks exploited unsustainably
 a<-datafinal[datafinal$fit<1,]
 a1<-merge(a, subset(psa, select=c("Stock", "family", "supfam"), by=all))
 table(a1$family, a1$GSA)
@@ -499,96 +557,5 @@ table(aa1$family, aa1$GSA)
 
 write.csv(merge(datafinal, subset(psa, select=c("Stock", "family", "supfam"), by=all)), file="predictedExploitation.csv")
 
-# try to plot overall results by super family and area
-datafinal2 <-merge(datafinal, subset(psa, select=c("Stock", "family", "supfam", "condro"), by=all))
-
-# Plot density by GSA
-ggplot(datafinal2, aes(x=fit))+geom_density(aes(fill=factor(supfam),alpha=0.5))+
-  facet_grid(GSA~supfam)+ geom_vline( xintercept=1,linetype=4 ) +
-  #geom_text(data=NULL, mapping=aes(x=1, y=0, label="F/Fmsy=1"), size=4, angle=90, vjust=-0.4, hjust=0)+
-  xlab("Predicted F/Fmsy")+scale_x_continuous(breaks=c(1,3,5,7))+scale_y_continuous(breaks=c(0,1,2))+scale_fill_discrete(name="Superfamily")
-
-# Plot density for all areas combined, allows visualization of all superfamilies
-ggplot(datafinal2, aes(x=fit))+geom_density(aes(fill=(supfam)))+facet_grid(supfam~.)+ theme(strip.text.y = element_text(size = 8, angle = 0))
-
-ggsave(last_plot(), file=paste("plotPredictFFmsy_KernelDensity",Sys.Date(),".png"), width=9, height=8, dpi=300)
-
-
-
-# Add plots for prediction diagnostics
-ggplot(datafinal2, aes(productivity, fit, color=supfam, ymin=cil, ymax=ciu))+ 
-  #  scale_colour_gradient2(midpoint=3, low="Darkgreen", high="red", name="Exploitation")+ 
-  #scale_colour_gradientn(colours=c("green","white","khaki2","yellow" ,"yellow2","orange","orange2","red","red2"),limits=c(0, 10),breaks=0:10, name="F/Fmsy")+
-	ylab("Predicted(F/Fmsy)")+
-	geom_errorbar(position = "jitter", alpha = 1/5)+
-	# stat_smooth()+
-	geom_hline( yintercept=1,linetype=4 )+
-  #geom_text(data=NULL, mapping=aes(x=1, y=0, label="F/Fmsy=1"), size=4)+
-	geom_point(position = "jitter", size=2)+
-	facet_grid(.~GSA)+
-  scale_y_continuous(breaks=c(1,4,7,9))+
-  scale_x_continuous(breaks=c(1,2,3))
-
-ggplot(datafinal2, aes(productivity, fit, color=condro, ymin=cil, ymax=ciu))+ 
-  #  scale_colour_gradient2(midpoint=3, low="Darkgreen", high="red", name="Exploitation")+ 
-  #scale_colour_gradientn(colours=c("green","white","khaki2","yellow" ,"yellow2","orange","orange2","red","red2"),limits=c(0, 10),breaks=0:10, name="F/Fmsy")+
-	ylab("Predicted(F/Fmsy)")+
-	geom_errorbar(position = "jitter")+
-	# stat_smooth()+
-	geom_hline( yintercept=1,linetype=4 )+
-  #geom_text(data=NULL, mapping=aes(x=1, y=0, label="F/Fmsy=1"), size=4)+
-	geom_point(position = "jitter", size=2)+
-	facet_grid(.~GSA)+
-  scale_y_continuous(breaks=c(1,4,7,9))+
-  scale_x_continuous(breaks=c(1,2,3))
-
-########### 
-# Compare fitted predictions for Hake with current assessments
-
-hake<-stockl2[stockl2$Species=="Merluccius merluccius",]
-hake2<-ddply(hake, .(GSA), summarize, Fratio=mean(Fratio))
-hake3<-merge(datafinal2[datafinal2$Stock=="Merluccius merluccius",], hake2, by="GSA")
-hake4<-merge(datafinal2[datafinal2$Stock=="Merluccius merluccius",], hake, by="GSA", all.y=TRUE)
-
-mullus<-stockl2[stockl2$Species=="Mullus barbatus",]
-mullus2<-ddply(hake, .(GSA), summarize, Fratio=mean(Fratio))
-hake3<-merge(datafinal2[datafinal2$Stock=="Mullus barbatus",], hake2, by="GSA")
-mullus4<-merge(datafinal2[datafinal2$Stock=="Mullus barbatus",], mullus, by="GSA", all.y=TRUE)
-
-
-ggplot(mullus4, aes(productivity, fit, color="GSA", ymin=cil, ymax=ciu))+ 
-  ylab("Predicted(F/Fmsy)")+
-  geom_errorbar()+
-	geom_hline( yintercept=1,linetype=4 )+
- 	geom_point( size=2)+
-  geom_point(aes( productivity, Fratio, color="blue"))+
-	facet_grid(.~GSA)
-+
-  scale_y_continuous(breaks=c(1,4,7,9))+
-  scale_x_continuous(breaks=c(1,2,3))
-
-
-
-# plot only hake predictions
-ggplot(datafinal2[datafinal2$Stock=="Merluccius merluccius",], aes(productivity, fit, color=condro, ymin=cil, ymax=ciu))+ 
-  #  scale_colour_gradient2(midpoint=3, low="Darkgreen", high="red", name="Exploitation")+ 
-  #scale_colour_gradientn(colours=c("green","white","khaki2","yellow" ,"yellow2","orange","orange2","red","red2"),limits=c(0, 10),breaks=0:10, name="F/Fmsy")+
-  ylab("Predicted(F/Fmsy)")+
-	geom_errorbar()+
-	# stat_smooth()+
-	geom_hline( yintercept=1,linetype=4 )+
-  #geom_text(data=NULL, mapping=aes(x=1, y=0, label="F/Fmsy=1"), size=4)+
-	geom_point( size=2)+
-	facet_grid(.~GSA)+
-  scale_y_continuous(breaks=c(1,4,7,9))+
-  scale_x_continuous(breaks=c(1,2,3))
-
-prova<-merge(datafinal2, stockl2, by.x=c("Stock","GSA"), by.y=c("Species", "GSA"), all.y=TRUE)
-prova<-droplevels(prova)
-
-ggplot(prova, aes(productivity, fit, color=Stock, ymin=cil, ymax=ciu))+ 
-  geom_errorbar()+
-  geom_point( size=2)+
-  geom_point(aes(productivity, Fratio), shape=4)+
-	facet_grid(.~GSA, drop=TRUE)+
-  ylab("Predicted(F/Fmsy)")
+datafinal[datafinal$cil>3,]
+ddply(datafinal3[datafinal3$fit>1,], .(supfam,GSA), summarize,  n.stocks=length(unique(as.character(Stock))), .drop = TRUE)
